@@ -1,9 +1,0 @@
-C:\Users\Oliver\Documents\Uni\Algorithmen+Spiele\ASPractical\ASAss1\Greeter\bin\Debug\netstandard1.5\Dominect.deps.json
-C:\Users\Oliver\Documents\Uni\Algorithmen+Spiele\ASPractical\ASAss1\Greeter\bin\Debug\netstandard1.5\Dominect.dll
-C:\Users\Oliver\Documents\Uni\Algorithmen+Spiele\ASPractical\ASAss1\Greeter\bin\Debug\netstandard1.5\Dominect.pdb
-C:\Users\Oliver\Documents\Uni\Algorithmen+Spiele\ASPractical\ASAss1\Greeter\obj\Debug\netstandard1.5\Dominect.csprojAssemblyReference.cache
-C:\Users\Oliver\Documents\Uni\Algorithmen+Spiele\ASPractical\ASAss1\Greeter\obj\Debug\netstandard1.5\Dominect.AssemblyInfoInputs.cache
-C:\Users\Oliver\Documents\Uni\Algorithmen+Spiele\ASPractical\ASAss1\Greeter\obj\Debug\netstandard1.5\Dominect.AssemblyInfo.cs
-C:\Users\Oliver\Documents\Uni\Algorithmen+Spiele\ASPractical\ASAss1\Greeter\obj\Debug\netstandard1.5\Dominect.csproj.CoreCompileInputs.cache
-C:\Users\Oliver\Documents\Uni\Algorithmen+Spiele\ASPractical\ASAss1\Greeter\obj\Debug\netstandard1.5\Dominect.dll
-C:\Users\Oliver\Documents\Uni\Algorithmen+Spiele\ASPractical\ASAss1\Greeter\obj\Debug\netstandard1.5\Dominect.pdb
