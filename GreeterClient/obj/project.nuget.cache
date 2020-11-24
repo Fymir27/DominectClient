@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "dgSpecHash": "Zb+vV2rDiQBPBxWb9qmSI65VZ093hwsoKJ08ePlVn+pcaiSu1S0fRsyqdM2IrQdzo61luR1laflO/xKDHtilQg==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Oliver\\Documents\\Uni\\Algorithmen+Spiele\\ASPractical\\ASAss1\\GreeterClient\\GreeterClient.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Oliver\\.nuget\\packages\\google.protobuf\\3.8.0\\google.protobuf.3.8.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\grpc\\2.23.0\\grpc.2.23.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\grpc.core\\2.23.0\\grpc.core.2.23.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\grpc.core.api\\2.23.0\\grpc.core.api.2.23.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\microsoft.netcore.app\\2.1.0\\microsoft.netcore.app.2.1.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\microsoft.netcore.dotnetapphost\\2.1.0\\microsoft.netcore.dotnetapphost.2.1.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\microsoft.netcore.dotnethostpolicy\\2.1.0\\microsoft.netcore.dotnethostpolicy.2.1.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\microsoft.netcore.dotnethostresolver\\2.1.0\\microsoft.netcore.dotnethostresolver.2.1.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\microsoft.netcore.platforms\\2.1.0\\microsoft.netcore.platforms.2.1.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\microsoft.netcore.targets\\2.1.0\\microsoft.netcore.targets.2.1.0.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512",
+    "C:\\Users\\Oliver\\.nuget\\packages\\system.memory\\4.5.3\\system.memory.4.5.3.nupkg.sha512"
+  ],
+  "logs": []
+}

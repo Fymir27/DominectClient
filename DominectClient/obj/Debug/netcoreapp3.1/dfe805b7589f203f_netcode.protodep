@@ -1,0 +1,3 @@
+obj\Debug\netcoreapp3.1\proto/Netcode.cs \
+obj\Debug\netcoreapp3.1\proto/NetcodeGrpc.cs: proto/dominect.proto\
+ proto/netcode.proto
