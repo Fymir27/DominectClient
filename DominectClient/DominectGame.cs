@@ -6,13 +6,11 @@ using System.Diagnostics;
 
 namespace DominectClient
 {
-    class Board
+    struct Board
     {
         public byte[,] Data { get => data; }
         public uint Width { get => width; }
         public uint Height { get => height; }
-
-        protected Board() { }
 
         private byte[,] data;
         private uint width;
@@ -80,6 +78,14 @@ namespace DominectClient
             };
         }
     }
+
+    class Node
+    {
+        public int Evaluation;
+        public GameTurn Move;
+        public List<Node> Children = new List<Node>();
+    }
+
     class DominectGame
     {
         private GameCom.GameComClient client;
@@ -87,6 +93,12 @@ namespace DominectClient
         private Random rnd;
 
         public bool MatchAborted { get; private set; }
+
+        // TODO: remove after testing
+        public DominectGame() 
+        {
+            this.rnd = new Random(); // TODO: Seed?
+        }
 
         public DominectGame(GameCom.GameComClient client, string matchToken, string userToken)
         {
@@ -197,7 +209,7 @@ namespace DominectClient
         {
             var board = Board.Parse(gameState.BoardData.ToByteArray(), gameState.BoardWidth, gameState.BoardHeight, beginningPlayer);
 
-            var possibleMoves = new List<GameTurn>();
+            var possibleMoves = GetPossibleMoves(board);
 
             for (uint y = 0; y < board.Height; y++)
             {
@@ -237,6 +249,99 @@ namespace DominectClient
             Console.WriteLine("Move taken: " + playedMove);
             board.Display(playedMove);
             Console.WriteLine("---");
+        }
+
+        public static List<GameTurn> GetPossibleMoves(Board board)
+        {
+            var possibleMoves = new List<GameTurn>();
+
+            for (uint y = 0; y < board.Height; y++)
+            {
+                for (uint x = 0; x < board.Width; x++)
+                {
+                    if (board.Data[x, y] != '0') continue;
+
+                    if (x + 1 < board.Width && board.Data[x + 1, y] == '0')
+                    {
+                        possibleMoves.Add(new GameTurn()
+                        {
+                            X1 = x,
+                            Y1 = y,
+                            X2 = x + 1,
+                            Y2 = y
+                        });
+                    }
+
+                    if (y + 1 < board.Height && board.Data[x, y + 1] == '0')
+                    {
+                        possibleMoves.Add(new GameTurn()
+                        {
+                            X1 = x,
+                            Y1 = y,
+                            X2 = x,
+                            Y2 = y + 1
+                        });
+                    }
+                }
+            }
+
+            return possibleMoves;
+        }
+
+        public Node GameTree(Board board, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth)
+        {
+            if (move != null)
+            {
+                byte b = maximizer ? (byte)'1' : (byte)'2';
+                board.Data[move.X1, move.Y1] = b;
+                board.Data[move.X2, move.Y2] = b;
+            }
+
+            var curNode = new Node();
+            curNode.Move = move;
+
+            if (remainingDepth == 0) 
+            {
+                curNode.Evaluation = Heuristic(board);
+                return curNode;
+            }
+
+            var possibleMoves = GetPossibleMoves(board);
+
+            if (possibleMoves.Count == 0) 
+            { 
+                curNode.Evaluation = Heuristic(board);
+                return curNode;
+            }
+
+            foreach(var newMove in possibleMoves)
+            {
+                var child = GameTree(board, newMove, !maximizer, alpha, beta, remainingDepth - 1);
+                if (maximizer)
+                {
+                    alpha = Math.Max(alpha, child.Evaluation);
+                }
+                else
+                {
+                    beta = Math.Min(beta, child.Evaluation);
+                }
+
+                curNode.Children.Add(child);
+
+                if (beta <= alpha)
+                {
+                    curNode.Evaluation = alpha;
+                    return curNode;
+                }
+            }
+
+            curNode.Evaluation = maximizer ? alpha : beta;
+            return curNode;
+        }
+
+        public int Heuristic(Board board)
+        {
+            return rnd.Next(-20, 21); // TODO: implement
         }
     }
 }

@@ -148,7 +148,19 @@ namespace DominectClient
             }
             */
 
-            bool playing = true;
+            uint width = 3;
+            uint height = 3;
+            var rawBoard = new byte[width * height];
+            Array.Fill(rawBoard, (byte)'0');
+            var startingBoard = Board.Parse(rawBoard, width, height, true);
+
+            var dummyGame = new DominectGame();           
+            var root = dummyGame.GameTree(startingBoard, null, true, int.MinValue, int.MaxValue, 3);
+            Console.WriteLine("Final root value: " + root.Evaluation);
+            var bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation >= best.Evaluation ? cur : best);
+            Console.WriteLine("Best Move: " + bestChild.Move.ToString());
+
+            bool playing = false; // TODO: turn back on
             int gamesPlayed = 0;
             bool manualMode = true;
 
