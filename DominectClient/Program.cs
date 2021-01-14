@@ -148,19 +148,10 @@ namespace DominectClient
             }
             */
 
-            uint width = 3;
-            uint height = 3;
-            var rawBoard = new byte[width * height];
-            Array.Fill(rawBoard, (byte)'0');
-            var startingBoard = Board.Parse(rawBoard, width, height, true);
+            ManualPlay(9, 9, 3); // TODO: comment out and turn playing on again
 
-            var dummyGame = new DominectGame();           
-            var root = dummyGame.GameTree(startingBoard, null, true, int.MinValue, int.MaxValue, 3);
-            Console.WriteLine("Final root value: " + root.Evaluation);
-            var bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation >= best.Evaluation ? cur : best);
-            Console.WriteLine("Best Move: " + bestChild.Move.ToString());
 
-            bool playing = false; // TODO: turn back on
+            bool playing = false;
             int gamesPlayed = 0;
             bool manualMode = true;
 
@@ -197,6 +188,78 @@ namespace DominectClient
             
 
             //File.WriteAllText("usertoken.txt", userToken);
+        }
+
+        public static void ManualPlay(uint width, uint height, int depth)
+        {
+            var rawBoard = new byte[width * height];
+            Array.Fill(rawBoard, (byte)'0');
+            var startingBoard = Board.Parse(rawBoard, width, height, true);
+
+            var dummyGame = new DominectGame();
+
+            string line = "";
+            do
+            {
+                line = Console.ReadLine();
+
+                if (line.Length == 0) break;
+
+                var coords = line.Split(' ');
+                uint x1 = uint.Parse(coords[0]);
+                uint y1 = uint.Parse(coords[1]);
+                uint x2 = uint.Parse(coords[2]);
+                uint y2 = uint.Parse(coords[3]);
+
+                startingBoard.Data[x1, y1] = (byte)'1';
+                startingBoard.Data[x2, y2] = (byte)'1';
+
+                var start = System.DateTime.Now;
+                var root = dummyGame.GameTree(startingBoard, null, false, int.MinValue, int.MaxValue, depth, 0);
+                var end = System.DateTime.Now;
+                Console.WriteLine("Final root value: " + root.Evaluation + " (" + (end - start).TotalSeconds + "s)");
+
+                var node = root;
+                bool max = false;
+                GameTurn bestMove;
+                while (node.Children.Count > 0)
+                {
+                    Console.WriteLine(node.Evaluation);
+                    Console.WriteLine("---");
+                    if (max)
+                        node = node.Children.Aggregate((best, cur) => cur.Evaluation >= best.Evaluation ? cur : best);
+                    else
+                        node = node.Children.Aggregate((best, cur) => cur.Evaluation <= best.Evaluation ? cur : best);
+                    max = !max;
+
+                    bestMove = new GameTurn()
+                    {
+                        X1 = node.X1,
+                        Y1 = node.Y1,
+                        X2 = node.X2,
+                        Y2 = node.Y2,
+                    };
+
+                    Console.WriteLine(bestMove);
+                    Console.WriteLine("########");
+                }
+
+                var bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation <= best.Evaluation ? cur : best);
+                bestMove = new GameTurn()
+                {
+                    X1 = bestChild.X1,
+                    Y1 = bestChild.Y1,
+                    X2 = bestChild.X2,
+                    Y2 = bestChild.Y2,
+                };
+
+                startingBoard.Data[bestChild.X1, bestChild.Y1] = (byte)'2';
+                startingBoard.Data[bestChild.X2, bestChild.Y2] = (byte)'2';
+
+                startingBoard.Display(bestMove);
+
+            } while (line.Length > 0);
+
         }
     }
 }

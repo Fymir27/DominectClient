@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Text;
 using System.Threading;
 using System.Diagnostics;
+using System.Linq;
 
 namespace DominectClient
 {
@@ -24,16 +26,24 @@ namespace DominectClient
         private static string green = esc + "[32m";
         private static string yellow = esc + "[33m";
 
-        private Dictionary<byte, string> rawToDisplayCharacter;
-
-        public void Display(GameTurn myTurn)
+        public void Display(GameTurn myTurn = null)
         {
+            string firstPlayerMarker = (myToken == 'X' ? green : red) + 'X';
+            string secondPlayerMarker = (myToken == 'O' ? green : red) + 'O';
+
+            var rawToDisplayCharacter = new Dictionary<byte, string>()
+            {
+                { (byte)'0', white + '.' },
+                { (byte)'1', firstPlayerMarker },
+                { (byte)'2', secondPlayerMarker }
+            };
+
             StringBuilder sb = new StringBuilder();
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
                 {
-                    if (x == myTurn.X1 && y == myTurn.Y1 || x == myTurn.X2 && y == myTurn.Y2)
+                    if (myTurn != null && (x == myTurn.X1 && y == myTurn.Y1 || x == myTurn.X2 && y == myTurn.Y2))
                         sb.Append(yellow + myToken);
                     else
                         sb.Append(rawToDisplayCharacter[data[x, y]]);
@@ -52,37 +62,80 @@ namespace DominectClient
 
             int x = 0;
             int y = 0;
-            foreach(var val in raw)
+            foreach (var val in raw)
             {
-                data[x, y] = val;               
-                if(++x >= width)
+                data[x, y] = val;
+                if (++x >= width)
                 {
                     x = 0;
                     y++;
                 }
             }
 
-            string firstPlayerMarker = (firstPlayer ? green : red) + "X";
-            string secondPlayerMarker = (firstPlayer ? red : green) + "O";
-
-            return new Board() { 
-                data = data, 
-                width = width, height = height,
-                rawToDisplayCharacter = new Dictionary<byte, string>()
-                {
-                    { (byte)'0', white + '.' },
-                    { (byte)'1', firstPlayerMarker },
-                    { (byte)'2', secondPlayerMarker }
-                },
-                myToken= firstPlayer ? 'X' : 'O'
+            return new Board()
+            {
+                data = data,
+                width = width,
+                height = height,
+                myToken = firstPlayer ? 'X' : 'O'
             };
         }
+
+        public static Board DeepCopy(Board other)
+        {
+            return new Board()
+            {
+                data = (byte[,])other.data.Clone(),
+                width = other.width,
+                height = other.height,
+                myToken = other.myToken
+            };
+        }
+    }
+
+    public struct Position
+    {
+        public uint X;
+        public uint Y;
+        public Position(uint x, uint y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        public Position[] Neighbours()
+        {
+            return new Position[]
+            {
+                    new Position(X + 1, Y),
+                    new Position(X + 1, Y + 1),
+                    new Position(X, Y + 1),
+                    new Position(X - 1, Y + 1),
+                    new Position(X - 1, Y),
+                    new Position(X - 1, Y - 1),
+                    new Position(X, Y - 1),
+                    new Position(X + 1, Y - 1)
+            };
+        }
+
+        public override bool Equals(object other)
+        {
+            if (other == null || !(other is Position)) return false;
+            var otherPos = (Position)other;
+            return this.X == otherPos.X && this.Y == otherPos.Y;
+        }
+
+        public override int GetHashCode()
+        {
+            return ((int)X << 15) + (int)Y;
+        }
+
     }
 
     class Node
     {
         public int Evaluation;
-        public GameTurn Move;
+        public uint X1, Y1, X2, Y2;
         public List<Node> Children = new List<Node>();
     }
 
@@ -94,8 +147,10 @@ namespace DominectClient
 
         public bool MatchAborted { get; private set; }
 
+        public Position[] allBoardPositions;
+
         // TODO: remove after testing
-        public DominectGame() 
+        public DominectGame()
         {
             this.rnd = new Random(); // TODO: Seed?
         }
@@ -110,7 +165,7 @@ namespace DominectClient
         public GameStateResponse QueryGameState()
         {
             var cToken = new System.Threading.CancellationToken();
-            return client.GetGameState(matchID, null, null, cToken);           
+            return client.GetGameState(matchID, null, null, cToken);
         }
 
         public void SubmitTurn(GameTurn turn)
@@ -122,7 +177,7 @@ namespace DominectClient
                 DomGameTurn = turn
             };
             var response = client.SubmitTurn(request, null, null, cToken);
-            if(response.TurnStatus == TurnStatus.InvalidTurn)
+            if (response.TurnStatus == TurnStatus.InvalidTurn)
             {
                 Console.WriteLine("Ooops, invalid turn!");
                 AbortMatch();
@@ -155,7 +210,7 @@ namespace DominectClient
         {
             GameStateResponse gameStateResponse = QueryGameState();
             Console.Write("Waiting for game to start");
-            while(gameStateResponse.GameStatus == GameStatus.MatchNotStarted)
+            while (gameStateResponse.GameStatus == GameStatus.MatchNotStarted)
             {
                 Thread.Sleep(1000);
                 Console.Write(".");
@@ -164,15 +219,17 @@ namespace DominectClient
             Console.WriteLine();
             Console.WriteLine("Opponent found!");
 
+            Console.WriteLine("Board size: " + gameStateResponse.DomGameState.BoardWidth + "/" + gameStateResponse.DomGameState.BoardHeight);
+
             Console.WriteLine("You are player " + (gameStateResponse.BeginningPlayer ? 1 : 2));
-          
+
             Console.WriteLine("Lets begin!");
 
             int waitTime = 500;
 
             bool waitingForOpponent = false;
-           
-            while(!GameOver(gameStateResponse.GameStatus))
+
+            while (!GameOver(gameStateResponse.GameStatus))
             {
                 gameStateResponse = QueryGameState();
 
@@ -195,7 +252,7 @@ namespace DominectClient
                         Console.WriteLine();
                         waitingForOpponent = false;
                         TakeTurn(gameStateResponse.DomGameState, gameStateResponse.BeginningPlayer);
-                        break;                        
+                        break;
 
                     default:
                         Console.WriteLine();
@@ -207,47 +264,33 @@ namespace DominectClient
 
         private void TakeTurn(GameState gameState, bool beginningPlayer)
         {
+            Console.WriteLine("My turn! Calculating...");
+            var start = System.DateTime.Now;
             var board = Board.Parse(gameState.BoardData.ToByteArray(), gameState.BoardWidth, gameState.BoardHeight, beginningPlayer);
 
-            var possibleMoves = GetPossibleMoves(board);
+            var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, 5, 0);
 
-            for (uint y = 0; y < board.Height; y++)
+            Node bestChild;
+
+            if (beginningPlayer)
+                bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation >= best.Evaluation ? cur : best);
+            else
+                bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation <= best.Evaluation ? cur : best);
+
+            var end = System.DateTime.Now;
+
+            Console.WriteLine("Seconds taken for turn: " + (end - start).TotalSeconds);
+
+            var bestMove = new GameTurn()
             {
-                for (uint x = 0; x < board.Width; x++)
-                {
-                    if (board.Data[x, y] != '0') continue;
-
-                    if(x + 1 < board.Width && board.Data[x + 1, y] == '0')
-                    {
-                        possibleMoves.Add(new GameTurn()
-                        {
-                            X1 = x,     Y1 = y,
-                            X2 = x + 1, Y2 = y
-                        }); 
-                    }
-                    
-                    if(y + 1 < board.Height && board.Data[x, y + 1] == '0')
-                    {
-                        possibleMoves.Add(new GameTurn()
-                        {
-                            X1 = x, Y1 = y,
-                            X2 = x, Y2 = y + 1
-                        });
-                    }
-                }
-            }
-
-            if (possibleMoves.Count == 0)
-            {
-                Console.WriteLine("No moves possible??");
-                AbortMatch();
-                return;
-            }
-
-            var playedMove = possibleMoves[rnd.Next(0, possibleMoves.Count)];
-            SubmitTurn(playedMove);
-            Console.WriteLine("Move taken: " + playedMove);
-            board.Display(playedMove);
+                X1 = bestChild.X1,
+                Y1 = bestChild.Y1,
+                X2 = bestChild.X2,
+                Y2 = bestChild.Y2,
+            };
+            SubmitTurn(bestMove);
+            Console.WriteLine("Move taken (Eval: " + bestChild.Evaluation + "): ");
+            board.Display(bestMove);
             Console.WriteLine("---");
         }
 
@@ -288,35 +331,72 @@ namespace DominectClient
             return possibleMoves;
         }
 
-        public Node GameTree(Board board, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth)
+        public Node GameTree(Board board, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth, int depth)
         {
-            if (move != null)
+            if (move == null)
             {
-                byte b = maximizer ? (byte)'1' : (byte)'2';
+                allBoardPositions = new Position[board.Width * board.Height];
+                for (uint y = 0; y < board.Height; y++)
+                {
+                    for (uint x = 0; x < board.Width; x++)
+                    {
+                        allBoardPositions[y * board.Width + x].X = x;
+                        allBoardPositions[y * board.Width + x].Y = y;
+                    }
+                }
+            }
+            else
+            {
+                byte b = maximizer ? (byte)'2' : (byte)'1';
+                board = Board.DeepCopy(board);
                 board.Data[move.X1, move.Y1] = b;
                 board.Data[move.X2, move.Y2] = b;
             }
 
             var curNode = new Node();
-            curNode.Move = move;
-
-            if (remainingDepth == 0) 
+            if (move != null)
             {
-                curNode.Evaluation = Heuristic(board);
+                curNode.X1 = move.X1;
+                curNode.Y1 = move.Y1;
+                curNode.X2 = move.X2;
+                curNode.Y2 = move.Y2;
+            }
+
+            if (GameOver(board))
+            {
+                //board.Display();                
+                curNode.Evaluation = (maximizer ? int.MinValue : int.MaxValue) - (maximizer ? (-depth) : (depth));
+                //Console.WriteLine("^Game Over^ -> " + curNode.Evaluation);
+                return curNode;
+            }
+
+            if (remainingDepth == 0)
+            {
+                curNode.Evaluation = Heuristic(board, depth);
                 return curNode;
             }
 
             var possibleMoves = GetPossibleMoves(board);
 
-            if (possibleMoves.Count == 0) 
-            { 
-                curNode.Evaluation = Heuristic(board);
+            if (possibleMoves.Count == 0)
+            {
+                curNode.Evaluation = (maximizer ? int.MinValue : int.MaxValue) - (maximizer ? (-depth) : (depth));
                 return curNode;
             }
 
-            foreach(var newMove in possibleMoves)
+            foreach (var newMove in possibleMoves)
             {
-                var child = GameTree(board, newMove, !maximizer, alpha, beta, remainingDepth - 1);
+                var child = GameTree(board, newMove, !maximizer, alpha, beta, remainingDepth - 1, depth + 1);
+
+                /*
+                if (Math.Abs(child.Evaluation) > (int.MaxValue >> 1))
+                {
+                    curNode.Children.Clear();
+                    curNode.Children.Add(child);
+                    return curNode;
+                }
+                */
+
                 if (maximizer)
                 {
                     alpha = Math.Max(alpha, child.Evaluation);
@@ -330,7 +410,7 @@ namespace DominectClient
 
                 if (beta <= alpha)
                 {
-                    curNode.Evaluation = alpha;
+                    curNode.Evaluation = maximizer ? alpha : beta; ;
                     return curNode;
                 }
             }
@@ -339,9 +419,240 @@ namespace DominectClient
             return curNode;
         }
 
-        public int Heuristic(Board board)
+        Dictionary<byte, List<HashSet<Position>>> GetConnectedAreas(Board board)
         {
-            return rnd.Next(-20, 21); // TODO: implement
+
+            var placedMarkers = new Dictionary<byte, HashSet<Position>>()
+            {
+                { (byte)'1', new HashSet<Position>() },
+                { (byte)'2', new HashSet<Position>() }
+            };
+
+            for (uint y = 0; y < board.Height; y++)
+            {
+                for (uint x = 0; x < board.Width; x++)
+                {
+                    if (board.Data[x, y] == (byte)'0') continue;
+                    placedMarkers[board.Data[x, y]].Add(new Position(x, y));
+                }
+            }
+
+            var result = new Dictionary<byte, List<HashSet<Position>>>()
+            {
+                { (byte)'1', new List<HashSet<Position>>() },
+                { (byte)'2', new List<HashSet<Position>>() }
+            };
+
+            foreach (var tuple in placedMarkers)
+            {
+                var marker = tuple.Key;
+                var positions = tuple.Value;
+
+                var queue = new Queue<Position>();
+                while (positions.Count > 0)
+                {
+                    queue.Clear();
+                    queue.Enqueue(positions.First());
+
+                    var area = new HashSet<Position>();
+
+                    while (queue.Count > 0)
+                    {
+                        var curPos = queue.Dequeue();
+                        area.Add(curPos);
+                        positions.Remove(curPos);
+                        var neighbours = curPos.Neighbours();
+                        for (int i = 0; i < 8; i++)
+                        {
+                            var neighbour = neighbours[i];
+                            if (positions.Contains(neighbour))
+                                queue.Enqueue(neighbour);
+                        }
+                    }
+
+                    result[marker].Add(area);
+                }
+            }
+
+            return result;
         }
+
+        public uint AreaSize(HashSet<Position> area, Func<Position, uint> getCoordinate)
+        {
+            uint min = uint.MaxValue; ;
+            uint max = 0;
+
+            foreach (var pos in area)
+            {
+                uint relevant = getCoordinate(pos);
+                if (relevant > max) max = relevant;
+                if (relevant < min) min = relevant;
+            }
+
+            return max - min + 1;
+        }
+
+        public uint heuristicID = 0;
+        public int Heuristic(Board board, int depth)
+        {
+            int[] scores = new int[2];
+            int scoreIndex = 0;
+            var queue = new Queue<Position>();
+            var processed = new HashSet<Position>();
+            foreach (byte b in new byte[] { (byte)'1', (byte)'2' })
+            {
+                uint maxScore = 0;
+                processed.Clear();
+                foreach (var startingPos in allBoardPositions)
+                {
+                    if (processed.Contains(startingPos)) continue;
+                    if (board.Data[startingPos.X, startingPos.Y] != b) continue;
+                    queue.Clear();
+                    queue.Enqueue(startingPos);
+                    processed.Add(startingPos);
+                    bool player1 = b == (byte)'1';
+                    uint minCoord = player1 ? startingPos.X : startingPos.Y;
+                    uint maxCoord = minCoord;
+                    uint score = 0;
+                    while (queue.Count > 0)
+                    {
+                        var pos = queue.Dequeue();
+                        foreach (var neighbour in pos.Neighbours())
+                        {
+                            if (neighbour.X < 0 ||
+                                neighbour.X >= board.Width ||
+                                neighbour.Y < 0 ||
+                                neighbour.Y >= board.Height ||
+                                processed.Contains(neighbour))
+                            {
+                                continue;
+                            }
+                            processed.Add(pos);
+
+                            byte neighbourByte = board.Data[neighbour.X, neighbour.Y];
+                            if (neighbourByte == (byte)'0')
+                            {
+                                queue.Enqueue(neighbour);
+                            }
+                            else if (neighbourByte == b)
+                            {
+                                queue.Enqueue(neighbour);
+                                uint curCoord = player1 ? neighbour.X : neighbour.Y;
+                                if (curCoord < minCoord)
+                                {
+                                    score++;
+                                    minCoord = curCoord;
+                                }
+                                else if (curCoord > maxCoord)
+                                {
+                                    score++;
+                                    maxCoord = curCoord;
+                                }
+                            }
+                        }
+                    }
+
+                    maxScore = Math.Max(maxScore, score);
+                }
+
+                scores[scoreIndex++] = (int)maxScore - depth;
+            }
+
+            var eval = scores[0] - scores[1];
+            //Console.WriteLine("^Eval^: " + eval);
+
+            return eval;
+        }
+
+        public bool GameOver(Board board)
+        {
+            var NextYs = new HashSet<int>();
+            for (int y = 0; y < board.Height; y++)
+            {
+                if (board.Data[0, y] == (byte)'1')
+                {
+                    NextYs.Add(y);
+                }
+            }
+
+            HashSet<int> curYs;
+
+            bool player1win = true;
+            for (int x = 0; x < board.Width - 1; x++)
+            {
+                curYs = NextYs;
+                NextYs = new HashSet<int>();
+                foreach (var y in curYs)
+                {
+                    if (y + 1 < board.Height && board.Data[x + 1, y + 1] == (byte)'1')
+                    {
+                        if (!NextYs.Contains(y + 1))
+                            NextYs.Add(y + 1);
+                    }
+                    if (board.Data[x + 1, y] == (byte)'1')
+                    {
+                        if (!NextYs.Contains(y))
+                            NextYs.Add(y);
+                    }
+                    if (y - 1 >= 0 && board.Data[x + 1, y - 1] == (byte)'1')
+                    {
+                        if (!NextYs.Contains(y - 1))
+                            NextYs.Add(y - 1);
+                    }
+                }
+
+                if (NextYs.Count == 0)
+                {
+                    player1win = false;
+                    break;
+                }
+            }
+
+            if (player1win) return true;
+
+
+            var NextXs = new HashSet<int>();
+            for (int x = 0; x < board.Width; x++)
+            {
+                if (board.Data[x, 0] == (byte)'2')
+                {
+                    NextXs.Add(x);
+                }
+            }
+
+            HashSet<int> curXs;
+
+            for (int y = 0; y < board.Height - 1; y++)
+            {
+                curXs = NextXs;
+                NextXs = new HashSet<int>();
+                foreach (var x in curXs)
+                {
+                    if (x + 1 < board.Width && board.Data[x + 1, y + 1] == (byte)'2')
+                    {
+                        if (!NextXs.Contains(x + 1))
+                            NextXs.Add(x + 1);
+                    }
+                    if (board.Data[x, y + 1] == (byte)'2')
+                    {
+                        if (!NextXs.Contains(x))
+                            NextXs.Add(x);
+                    }
+                    if (x - 1 >= 0 && board.Data[x - 1, y + 1] == (byte)'2')
+                    {
+                        if (!NextXs.Contains(x - 1))
+                            NextXs.Add(x - 1);
+                    }
+                }
+
+                if (NextXs.Count == 0)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
     }
 }
