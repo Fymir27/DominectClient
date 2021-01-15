@@ -148,7 +148,7 @@ namespace DominectClient
             }
             */
 
-            ManualPlay(9, 9, 3); // TODO: comment out and turn playing on again
+            ManualPlay(15, 15, 2); // TODO: comment out and turn playing on again
 
 
             bool playing = false;
@@ -214,38 +214,21 @@ namespace DominectClient
                 startingBoard.Data[x1, y1] = (byte)'1';
                 startingBoard.Data[x2, y2] = (byte)'1';
 
+                var playerMove = new GameTurn
+                {
+                    X1 = x1,
+                    Y1 = y1,
+                    X2 = x2,
+                    Y2 = y2
+                };
+
                 var start = System.DateTime.Now;
                 var root = dummyGame.GameTree(startingBoard, null, false, int.MinValue, int.MaxValue, depth, 0);
                 var end = System.DateTime.Now;
-                Console.WriteLine("Final root value: " + root.Evaluation + " (" + (end - start).TotalSeconds + "s)");
+                Console.WriteLine("Final root value: " + root.Evaluation + " (" + (end - start).TotalSeconds + "s)");              
 
-                var node = root;
-                bool max = false;
-                GameTurn bestMove;
-                while (node.Children.Count > 0)
-                {
-                    Console.WriteLine(node.Evaluation);
-                    Console.WriteLine("---");
-                    if (max)
-                        node = node.Children.Aggregate((best, cur) => cur.Evaluation >= best.Evaluation ? cur : best);
-                    else
-                        node = node.Children.Aggregate((best, cur) => cur.Evaluation <= best.Evaluation ? cur : best);
-                    max = !max;
-
-                    bestMove = new GameTurn()
-                    {
-                        X1 = node.X1,
-                        Y1 = node.Y1,
-                        X2 = node.X2,
-                        Y2 = node.Y2,
-                    };
-
-                    Console.WriteLine(bestMove);
-                    Console.WriteLine("########");
-                }
-
-                var bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation <= best.Evaluation ? cur : best);
-                bestMove = new GameTurn()
+                var bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation < best.Evaluation ? cur : best);
+                var bestMove = new GameTurn()
                 {
                     X1 = bestChild.X1,
                     Y1 = bestChild.Y1,
@@ -255,6 +238,8 @@ namespace DominectClient
 
                 startingBoard.Data[bestChild.X1, bestChild.Y1] = (byte)'2';
                 startingBoard.Data[bestChild.X2, bestChild.Y2] = (byte)'2';
+                //startingBoard.Data[x1, y1] = (byte)'1';
+                //startingBoard.Data[x2, y2] = (byte)'1';
 
                 startingBoard.Display(bestMove);
 

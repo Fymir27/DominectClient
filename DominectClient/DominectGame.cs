@@ -137,6 +137,9 @@ namespace DominectClient
         public int Evaluation;
         public uint X1, Y1, X2, Y2;
         public List<Node> Children = new List<Node>();
+        //public Board Board;
+        //public int alpha;
+        //public int beta;
     }
 
     class DominectGame
@@ -147,7 +150,8 @@ namespace DominectClient
 
         public bool MatchAborted { get; private set; }
 
-        public Position[] allBoardPositions;
+        Position[] allBoardPositions;
+        List<Position>[,] neighbours;
 
         // TODO: remove after testing
         public DominectGame()
@@ -268,14 +272,14 @@ namespace DominectClient
             var start = System.DateTime.Now;
             var board = Board.Parse(gameState.BoardData.ToByteArray(), gameState.BoardWidth, gameState.BoardHeight, beginningPlayer);
 
-            var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, 5, 0);
+            var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, 2, 0);
 
             Node bestChild;
 
             if (beginningPlayer)
-                bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation >= best.Evaluation ? cur : best);
+                bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation > best.Evaluation ? cur : best);
             else
-                bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation <= best.Evaluation ? cur : best);
+                bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation < best.Evaluation ? cur : best);
 
             var end = System.DateTime.Now;
 
@@ -331,26 +335,51 @@ namespace DominectClient
             return possibleMoves;
         }
 
-        public Node GameTree(Board board, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth, int depth)
+        public void InitInternals(Board board)
         {
-            if (move == null)
+            allBoardPositions = new Position[board.Width * board.Height];
+            neighbours = new List<Position>[board.Width, board.Height];
+            for (uint y = 0; y < board.Height; y++)
             {
-                allBoardPositions = new Position[board.Width * board.Height];
-                for (uint y = 0; y < board.Height; y++)
+                for (uint x = 0; x < board.Width; x++)
                 {
-                    for (uint x = 0; x < board.Width; x++)
+                    var pos = allBoardPositions[y * board.Width + x];
+                    pos.X = x;
+                    pos.Y = y;
+
+                    neighbours[x, y] = new List<Position>();
+                    foreach (var neighbour in pos.Neighbours())
                     {
-                        allBoardPositions[y * board.Width + x].X = x;
-                        allBoardPositions[y * board.Width + x].Y = y;
+                        if (neighbour.X >= 0 &&
+                            neighbour.Y >= 0 &&
+                            neighbour.X < board.Width &&                            
+                            neighbour.Y < board.Height)
+                        {
+                            neighbours[x, y].Add(neighbour);
+                        }
                     }
                 }
             }
-            else
+        }
+
+        public Node GameTree(Board oldBoard, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth, int depth)
+        {
+            if (depth == 0)
+            {
+                InitInternals(oldBoard);
+            }
+
+            Board board;
+            if (move != null)
             {
                 byte b = maximizer ? (byte)'2' : (byte)'1';
-                board = Board.DeepCopy(board);
+                board = Board.DeepCopy(oldBoard);
                 board.Data[move.X1, move.Y1] = b;
                 board.Data[move.X2, move.Y2] = b;
+            }
+            else
+            {
+                board = oldBoard;
             }
 
             var curNode = new Node();
@@ -362,8 +391,12 @@ namespace DominectClient
                 curNode.Y2 = move.Y2;
             }
 
+            //board.Display();
+            //curNode.Board = board;
+
             if (GameOver(board))
             {
+                if (move == null) maximizer = !maximizer;
                 //board.Display();                
                 curNode.Evaluation = (maximizer ? int.MinValue : int.MaxValue) - (maximizer ? (-depth) : (depth));
                 //Console.WriteLine("^Game Over^ -> " + curNode.Evaluation);
@@ -372,7 +405,7 @@ namespace DominectClient
 
             if (remainingDepth == 0)
             {
-                curNode.Evaluation = Heuristic(board, depth);
+                curNode.Evaluation = Heuristic(board, depth);               
                 return curNode;
             }
 
@@ -380,14 +413,15 @@ namespace DominectClient
 
             if (possibleMoves.Count == 0)
             {
-                curNode.Evaluation = (maximizer ? int.MinValue : int.MaxValue) - (maximizer ? (-depth) : (depth));
+                curNode.Evaluation = 0;
                 return curNode;
             }
 
             foreach (var newMove in possibleMoves)
             {
                 var child = GameTree(board, newMove, !maximizer, alpha, beta, remainingDepth - 1, depth + 1);
-
+                curNode.Children.Add(child);
+               
                 /*
                 if (Math.Abs(child.Evaluation) > (int.MaxValue >> 1))
                 {
@@ -405,12 +439,13 @@ namespace DominectClient
                 {
                     beta = Math.Min(beta, child.Evaluation);
                 }
-
-                curNode.Children.Add(child);
+                
+                //curNode.alpha = alpha;
+                //curNode.beta = beta;
 
                 if (beta <= alpha)
                 {
-                    curNode.Evaluation = maximizer ? alpha : beta; ;
+                    curNode.Evaluation = maximizer ? beta : alpha; ;
                     return curNode;
                 }
             }
@@ -517,13 +552,9 @@ namespace DominectClient
                     while (queue.Count > 0)
                     {
                         var pos = queue.Dequeue();
-                        foreach (var neighbour in pos.Neighbours())
+                        foreach (var neighbour in neighbours[pos.X, pos.Y])
                         {
-                            if (neighbour.X < 0 ||
-                                neighbour.X >= board.Width ||
-                                neighbour.Y < 0 ||
-                                neighbour.Y >= board.Height ||
-                                processed.Contains(neighbour))
+                            if (processed.Contains(neighbour))
                             {
                                 continue;
                             }
@@ -540,12 +571,12 @@ namespace DominectClient
                                 uint curCoord = player1 ? neighbour.X : neighbour.Y;
                                 if (curCoord < minCoord)
                                 {
-                                    score++;
+                                    score += 100;
                                     minCoord = curCoord;
                                 }
                                 else if (curCoord > maxCoord)
                                 {
-                                    score++;
+                                    score += 100;
                                     maxCoord = curCoord;
                                 }
                             }
