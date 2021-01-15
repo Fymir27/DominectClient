@@ -127,9 +127,8 @@ namespace DominectClient
 
         public override int GetHashCode()
         {
-            return ((int)X << 15) + (int)Y;
+            return ((int)X << 16) + (int)Y;
         }
-
     }
 
     class Node
@@ -272,7 +271,7 @@ namespace DominectClient
             var start = System.DateTime.Now;
             var board = Board.Parse(gameState.BoardData.ToByteArray(), gameState.BoardWidth, gameState.BoardHeight, beginningPlayer);
 
-            var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, 2, 0);
+            var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, 4, 0);
 
             Node bestChild;
 
@@ -533,56 +532,83 @@ namespace DominectClient
             int[] scores = new int[2];
             int scoreIndex = 0;
             var queue = new Queue<Position>();
-            var processed = new HashSet<Position>();
+            var processed = new HashSet<int>();
             foreach (byte b in new byte[] { (byte)'1', (byte)'2' })
             {
-                uint maxScore = 0;
+                int maxScore = 0;
                 processed.Clear();
                 foreach (var startingPos in allBoardPositions)
                 {
-                    if (processed.Contains(startingPos)) continue;
+                    int posFingerprint = startingPos.GetHashCode();
+                    if (processed.Contains(posFingerprint)) continue;
                     if (board.Data[startingPos.X, startingPos.Y] != b) continue;
                     queue.Clear();
                     queue.Enqueue(startingPos);
-                    processed.Add(startingPos);
+                    processed.Add(posFingerprint);
                     bool player1 = b == (byte)'1';
                     uint minCoord = player1 ? startingPos.X : startingPos.Y;
                     uint maxCoord = minCoord;
-                    uint score = 0;
+                    uint minCoordTotal = uint.MaxValue;
+                    uint maxCoordTotal = 0;
+                    int size = 0;
                     while (queue.Count > 0)
                     {
                         var pos = queue.Dequeue();
                         foreach (var neighbour in neighbours[pos.X, pos.Y])
                         {
-                            if (processed.Contains(neighbour))
+                            int neighbourFingerprint = neighbour.GetHashCode();
+                            if (processed.Contains(neighbourFingerprint))
                             {
                                 continue;
                             }
-                            processed.Add(pos);
+                            processed.Add(neighbourFingerprint);
+
+                            uint curCoord = player1 ? neighbour.X : neighbour.Y;
+
+                            if(curCoord < minCoordTotal)
+                            {
+                                minCoordTotal = curCoord;
+                            } 
+                            else if(curCoord > maxCoordTotal)
+                            {
+                                maxCoordTotal = curCoord;
+                            }
 
                             byte neighbourByte = board.Data[neighbour.X, neighbour.Y];
-                            if (neighbourByte == (byte)'0')
+                            if (neighbourByte == (byte)'0' && 
+                                neighbours[neighbour.X, neighbour.Y]
+                                    .Any(p => board.Data[p.X, p.Y] == (byte)'0'))
                             {
                                 queue.Enqueue(neighbour);
                             }
                             else if (neighbourByte == b)
                             {
-                                queue.Enqueue(neighbour);
-                                uint curCoord = player1 ? neighbour.X : neighbour.Y;
+                                queue.Enqueue(neighbour);                                
                                 if (curCoord < minCoord)
                                 {
-                                    score += 100;
+                                    size++;
                                     minCoord = curCoord;
                                 }
                                 else if (curCoord > maxCoord)
                                 {
-                                    score += 100;
+                                    size++;
                                     maxCoord = curCoord;
                                 }
                             }
                         }
                     }
 
+                    int score;
+                    uint totalSize = maxCoordTotal - minCoordTotal + 1;
+                    if(totalSize < (player1 ? board.Width : board.Height))
+                    {
+                        score = -1;
+                    }
+                    else
+                    {
+                        score = size;
+                    }
+                     
                     maxScore = Math.Max(maxScore, score);
                 }
 

@@ -148,10 +148,10 @@ namespace DominectClient
             }
             */
 
-            ManualPlay(15, 15, 2); // TODO: comment out and turn playing on again
+            //ManualPlay(15, 15, 4); // TODO: comment out and turn playing on again
 
 
-            bool playing = false;
+            bool playing = true;
             int gamesPlayed = 0;
             bool manualMode = true;
 
