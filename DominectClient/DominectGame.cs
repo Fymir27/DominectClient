@@ -145,7 +145,7 @@ namespace DominectClient
     {
         private GameCom.GameComClient client;
         private MatchIDPacket matchID;
-        private Random rnd;
+        private Random rnd;        
 
         public bool MatchAborted { get; private set; }
 
@@ -227,6 +227,9 @@ namespace DominectClient
             Console.WriteLine("You are player " + (gameStateResponse.BeginningPlayer ? 1 : 2));
 
             Console.WriteLine("Lets begin!");
+
+            
+            InitInternals((int)gameStateResponse.DomGameState.BoardWidth, (int)gameStateResponse.DomGameState.BoardHeight);          
 
             int waitTime = 500;
 
@@ -334,15 +337,15 @@ namespace DominectClient
             return possibleMoves;
         }
 
-        public void InitInternals(Board board)
+        public void InitInternals(int width, int height)
         {
-            allBoardPositions = new Position[board.Width * board.Height];
-            neighbours = new List<Position>[board.Width, board.Height];
-            for (uint y = 0; y < board.Height; y++)
+            allBoardPositions = new Position[width * height];
+            neighbours = new List<Position>[width, height];
+            for (uint y = 0; y < height; y++)
             {
-                for (uint x = 0; x < board.Width; x++)
+                for (uint x = 0; x < width; x++)
                 {
-                    var pos = allBoardPositions[y * board.Width + x];
+                    var pos = allBoardPositions[y * width + x];
                     pos.X = x;
                     pos.Y = y;
 
@@ -351,8 +354,8 @@ namespace DominectClient
                     {
                         if (neighbour.X >= 0 &&
                             neighbour.Y >= 0 &&
-                            neighbour.X < board.Width &&                            
-                            neighbour.Y < board.Height)
+                            neighbour.X < width &&                            
+                            neighbour.Y < height)
                         {
                             neighbours[x, y].Add(neighbour);
                         }
@@ -362,11 +365,7 @@ namespace DominectClient
         }
 
         public Node GameTree(Board oldBoard, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth, int depth)
-        {
-            if (depth == 0)
-            {
-                InitInternals(oldBoard);
-            }
+        {           
 
             Board board;
             if (move != null)
@@ -532,19 +531,19 @@ namespace DominectClient
             int[] scores = new int[2];
             int scoreIndex = 0;
             var queue = new Queue<Position>();
-            var processed = new HashSet<int>();
+            Span<bool> processed = stackalloc bool[(int)board.Width * (int)board.Height];
             foreach (byte b in new byte[] { (byte)'1', (byte)'2' })
             {
                 int maxScore = 0;
                 processed.Clear();
                 foreach (var startingPos in allBoardPositions)
                 {
-                    int posFingerprint = startingPos.GetHashCode();
-                    if (processed.Contains(posFingerprint)) continue;
+                    int posInex = (int)startingPos.Y * (int)board.Width + (int)startingPos.X;
+                    if (processed[posInex]) continue;
                     if (board.Data[startingPos.X, startingPos.Y] != b) continue;
                     queue.Clear();
                     queue.Enqueue(startingPos);
-                    processed.Add(posFingerprint);
+                    processed[posInex] = true;
                     bool player1 = b == (byte)'1';
                     uint minCoord = player1 ? startingPos.X : startingPos.Y;
                     uint maxCoord = minCoord;
@@ -556,12 +555,12 @@ namespace DominectClient
                         var pos = queue.Dequeue();
                         foreach (var neighbour in neighbours[pos.X, pos.Y])
                         {
-                            int neighbourFingerprint = neighbour.GetHashCode();
-                            if (processed.Contains(neighbourFingerprint))
-                            {
+                            int neighbourIndex = (int)neighbour.Y * (int)board.Width + (int)neighbour.X;
+                            
+                            if (processed[neighbourIndex])
                                 continue;
-                            }
-                            processed.Add(neighbourFingerprint);
+
+                            processed[neighbourIndex] = true;
 
                             uint curCoord = player1 ? neighbour.X : neighbour.Y;
 

@@ -148,16 +148,16 @@ namespace DominectClient
             }
             */
 
-            //ManualPlay(15, 15, 4); // TODO: comment out and turn playing on again
+            ManualPlay(15, 15, 4); // TODO: comment out and turn playing on again
 
 
-            bool playing = true;
+            bool playing = false;
             int gamesPlayed = 0;
             bool manualMode = true;
 
             while(playing && gamesPlayed < 100)
             {
-                var match = GetDominectMatch(client, 8, 8, userToken);
+                var match = GetDominectMatch(client, 9, 9, userToken);
 
                 var game = new DominectGame(client, match.MatchToken, userToken);
                 game.Start(match.BeginningPlayer);
@@ -197,6 +197,7 @@ namespace DominectClient
             var startingBoard = Board.Parse(rawBoard, width, height, true);
 
             var dummyGame = new DominectGame();
+            dummyGame.InitInternals((int) width, (int)height);
 
             string line = "";
             do
@@ -242,6 +243,7 @@ namespace DominectClient
                 //startingBoard.Data[x2, y2] = (byte)'1';
 
                 startingBoard.Display(bestMove);
+                bestChild = null;
 
             } while (line.Length > 0);
 
