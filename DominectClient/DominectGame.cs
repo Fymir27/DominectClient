@@ -300,10 +300,8 @@ namespace DominectClient
             Console.WriteLine("---");
         }
 
-        public static List<GameTurn> GetPossibleMoves(Board board)
+        public IEnumerable<GameTurn> GetPossibleMoves(Board board)
         {
-            var possibleMoves = new List<GameTurn>();
-
             for (uint y = 0; y < board.Height; y++)
             {
                 for (uint x = 0; x < board.Width; x++)
@@ -312,29 +310,27 @@ namespace DominectClient
 
                     if (x + 1 < board.Width && board.Data[x + 1, y] == '0')
                     {
-                        possibleMoves.Add(new GameTurn()
+                        yield return new GameTurn()
                         {
                             X1 = x,
                             Y1 = y,
                             X2 = x + 1,
                             Y2 = y
-                        });
+                        };
                     }
 
                     if (y + 1 < board.Height && board.Data[x, y + 1] == '0')
                     {
-                        possibleMoves.Add(new GameTurn()
+                        yield return new GameTurn()
                         {
                             X1 = x,
                             Y1 = y,
                             X2 = x,
                             Y2 = y + 1
-                        });
+                        };
                     }
                 }
-            }
-
-            return possibleMoves;
+            }           
         }
 
         public void InitInternals(int width, int height)
@@ -409,7 +405,7 @@ namespace DominectClient
 
             var possibleMoves = GetPossibleMoves(board);
 
-            if (possibleMoves.Count == 0)
+            if (possibleMoves.Count() == 0)
             {
                 curNode.Evaluation = 0;
                 return curNode;
