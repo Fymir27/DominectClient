@@ -316,10 +316,21 @@ namespace DominectClient
                 X2 = bestChild.X2,
                 Y2 = bestChild.Y2,
             };
-            SubmitTurn(bestMove);
-            Console.WriteLine("Move taken (Eval: " + bestChild.Evaluation + "): ");
-            board.Display(bestMove);
-            Console.WriteLine("---");
+
+            try
+            {
+                SubmitTurn(bestMove);
+            } 
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            finally
+            {
+                Console.WriteLine("Move taken (Eval: " + bestChild.Evaluation + "): ");
+                board.Display(bestMove);
+                Console.WriteLine("---");
+            }            
         }
 
         public IEnumerable<GameTurn> GetPossibleMoves(Board board)
@@ -417,7 +428,7 @@ namespace DominectClient
 
             var possibleMoves = GetPossibleMoves(board);
 
-            if (possibleMoves.Any())
+            if (!possibleMoves.Any())
             {
                 return new Node(0, move);
             }
