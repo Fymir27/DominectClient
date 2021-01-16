@@ -417,7 +417,7 @@ namespace DominectClient
 
             var possibleMoves = GetPossibleMoves(board);
 
-            if (possibleMoves.Count() == 0)
+            if (possibleMoves.Any())
             {
                 return new Node(0, move);
             }
