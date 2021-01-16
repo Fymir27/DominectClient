@@ -168,6 +168,8 @@ namespace DominectClient
 
         public bool MatchAborted { get; private set; }
 
+        public GameStatus Status { get; private set; }
+
         Position[] allBoardPositions;
         List<Position>[,] neighbours;
 
@@ -279,7 +281,16 @@ namespace DominectClient
                     case GameStatus.YourTurn:
                         Console.WriteLine();
                         waitingForOpponent = false;
-                        TakeTurn(gameStateResponse.DomGameState, gameStateResponse.BeginningPlayer);
+                        try
+                        {
+                            TakeTurn(gameStateResponse.DomGameState, gameStateResponse.BeginningPlayer);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e.Message);
+                            return;
+                        }                        
+
                         break;
 
                     default:
@@ -296,7 +307,7 @@ namespace DominectClient
             var start = System.DateTime.Now;
             var board = Board.Parse(gameState.BoardData.ToByteArray(), gameState.BoardWidth, gameState.BoardHeight, beginningPlayer);
 
-            var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, 4, 0);
+            var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, 2, 0);
 
             Node bestChild = null;
 
@@ -379,7 +390,7 @@ namespace DominectClient
                     pos.Y = y;
 
                     neighbours[x, y] = new List<Position>();
-                    foreach (var neighbour in pos.Neighbours())
+                    foreach (var neighbour in pos.Neighbours().OrderBy(p => rnd.Next()))
                     {
                         if (neighbour.X >= 0 &&
                             neighbour.Y >= 0 &&
@@ -391,6 +402,7 @@ namespace DominectClient
                     }
                 }
             }
+            allBoardPositions = allBoardPositions.OrderBy(p => rnd.Next()).ToArray();
         }
 
         public Node GameTree(Board oldBoard, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth, int depth)
