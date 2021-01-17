@@ -5,18 +5,15 @@ using System.Text;
 using System.Threading;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace DominectClient
 {
     struct Board
     {
-        public byte[,] Data { get => data; }
-        public uint Width { get => width; }
-        public uint Height { get => height; }
-
-        private byte[,] data;
-        private uint width;
-        private uint height;
+        public byte[,] Data;
+        public uint Width;
+        public uint Height;
 
         private char myToken;
 
@@ -39,14 +36,14 @@ namespace DominectClient
             };
 
             StringBuilder sb = new StringBuilder();
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < Height; y++)
             {
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < Width; x++)
                 {
                     if (myTurn != null && (x == myTurn.X1 && y == myTurn.Y1 || x == myTurn.X2 && y == myTurn.Y2))
                         sb.Append(yellow + myToken);
                     else
-                        sb.Append(rawToDisplayCharacter[data[x, y]]);
+                        sb.Append(rawToDisplayCharacter[Data[x, y]]);
                 }
                 sb.AppendLine();
             }
@@ -56,8 +53,6 @@ namespace DominectClient
 
         public static Board Parse(byte[] raw, uint width, uint height, bool firstPlayer)
         {
-            Debug.Assert(raw.Length == width * height);
-
             var data = new byte[width, height];
 
             int x = 0;
@@ -74,9 +69,9 @@ namespace DominectClient
 
             return new Board()
             {
-                data = data,
-                width = width,
-                height = height,
+                Data = data,
+                Width = width,
+                Height = height,
                 myToken = firstPlayer ? 'X' : 'O'
             };
         }
@@ -85,9 +80,9 @@ namespace DominectClient
         {
             return new Board()
             {
-                data = (byte[,])other.data.Clone(),
-                width = other.width,
-                height = other.height,
+                Data = (byte[,])other.Data.Clone(),
+                Width = other.Width,
+                Height = other.Height,
                 myToken = other.myToken
             };
         }
@@ -118,6 +113,17 @@ namespace DominectClient
             };
         }
 
+        public Position[] DirectNeighbours()
+        {
+            return new Position[]
+            {
+                    new Position(X + 1, Y),
+                    new Position(X, Y + 1),
+                    new Position(X - 1, Y),
+                    new Position(X, Y - 1),
+            };
+        }
+
         public override bool Equals(object other)
         {
             if (other == null || !(other is Position)) return false;
@@ -135,7 +141,7 @@ namespace DominectClient
     {
         public int Evaluation;
         public uint X1, Y1, X2, Y2;
-        public List<Node> Children = new List<Node>();
+        //public List<Node> Children = new List<Node>();
         //public Board Board;
         //public int alpha;
         //public int beta;
@@ -164,14 +170,20 @@ namespace DominectClient
     {
         private GameCom.GameComClient client;
         private MatchIDPacket matchID;
-        private Random rnd;        
+        private Random rnd;
 
+        public List<Node> Children = new List<Node>();
         public bool MatchAborted { get; private set; }
 
         public GameStatus Status { get; private set; }
 
         Position[] allBoardPositions;
         List<Position>[,] neighbours;
+        List<Position>[,] directNeighbours;
+
+        public int[] maxPlayerScore = new int[] { 0, 0 };
+
+        Stopwatch stopwatch = new Stopwatch();
 
         // TODO: remove after testing
         public DominectGame()
@@ -249,8 +261,9 @@ namespace DominectClient
 
             Console.WriteLine("Lets begin!");
 
-            
-            InitInternals((int)gameStateResponse.DomGameState.BoardWidth, (int)gameStateResponse.DomGameState.BoardHeight);          
+            stopwatch.Restart();
+
+            InitInternals((int)gameStateResponse.DomGameState.BoardWidth, (int)gameStateResponse.DomGameState.BoardHeight);
 
             int waitTime = 500;
 
@@ -267,9 +280,9 @@ namespace DominectClient
                         {
                             waitingForOpponent = true;
                             Console.Write("Waiting for opponent to move");
-                            System.GC.Collect();
-                            System.GC.WaitForPendingFinalizers();
-                            System.GC.Collect();
+                            //System.GC.Collect();
+                            //System.GC.WaitForPendingFinalizers();
+                            //System.GC.Collect();
                         }
                         else
                         {
@@ -289,7 +302,7 @@ namespace DominectClient
                         {
                             Console.WriteLine(e.Message);
                             return;
-                        }                        
+                        }
 
                         break;
 
@@ -303,22 +316,42 @@ namespace DominectClient
 
         private void TakeTurn(GameState gameState, bool beginningPlayer)
         {
-            Console.WriteLine("My turn! Calculating...");
-            var start = System.DateTime.Now;
+
             var board = Board.Parse(gameState.BoardData.ToByteArray(), gameState.BoardWidth, gameState.BoardHeight, beginningPlayer);
 
-            var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, 2, 0);
+            Console.WriteLine("Opponent played:");
+            board.Display();
+
+            int depth = 4;
+
+            /*
+            int tilesToWin = Math.Min((int)board.Width - maxPlayerScore[0], (int)board.Height - maxPlayerScore[1]);
+            if(tilesToWin <= 6)
+            {
+                depth = 3;
+            }
+            */
+
+
+            int boardFillAmount = gameState.BoardData.Count(b => b != (byte)'0');
+            int boardSize = gameState.BoardData.Length;
+            int tilesLeft = boardSize - boardFillAmount;
+
+            Console.WriteLine("My turn! Calculating... Depth " + depth);
+
+            Children.Clear();
+            var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, depth, 0);
 
             Node bestChild = null;
 
             if (beginningPlayer)
-                bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation > best.Evaluation ? cur : best);
+                bestChild = Children.Aggregate((best, cur) => cur.Evaluation > best.Evaluation ? cur : best);
             else
-                bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation < best.Evaluation ? cur : best);
+                bestChild = Children.Aggregate((best, cur) => cur.Evaluation < best.Evaluation ? cur : best);
 
             var end = System.DateTime.Now;
 
-            Console.WriteLine("Seconds taken for turn: " + (end - start).TotalSeconds);
+            Console.WriteLine("Seconds taken for turn: " + stopwatch.Elapsed.TotalSeconds);
 
             var bestMove = new GameTurn()
             {
@@ -328,20 +361,12 @@ namespace DominectClient
                 Y2 = bestChild.Y2,
             };
 
-            try
-            {
-                SubmitTurn(bestMove);
-            } 
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            finally
-            {
-                Console.WriteLine("Move taken (Eval: " + bestChild.Evaluation + "): ");
-                board.Display(bestMove);
-                Console.WriteLine("---");
-            }            
+            SubmitTurn(bestMove);
+
+            Console.WriteLine("Move taken (Eval: " + bestChild.Evaluation + "): ");
+            board.Display(bestMove);
+            Console.WriteLine("---");
+
         }
 
         public IEnumerable<GameTurn> GetPossibleMoves(Board board)
@@ -374,13 +399,14 @@ namespace DominectClient
                         };
                     }
                 }
-            }           
+            }
         }
 
         public void InitInternals(int width, int height)
         {
             allBoardPositions = new Position[width * height];
             neighbours = new List<Position>[width, height];
+            directNeighbours = new List<Position>[width, height];
             for (uint y = 0; y < height; y++)
             {
                 for (uint x = 0; x < width; x++)
@@ -390,36 +416,47 @@ namespace DominectClient
                     pos.Y = y;
 
                     neighbours[x, y] = new List<Position>();
-                    foreach (var neighbour in pos.Neighbours().OrderBy(p => rnd.Next()))
+                    directNeighbours[x, y] = new List<Position>();
+                    foreach (var neighbour in pos.Neighbours()) //.OrderBy(p => rnd.Next()))
                     {
                         if (neighbour.X >= 0 &&
                             neighbour.Y >= 0 &&
-                            neighbour.X < width &&                            
+                            neighbour.X < width &&
                             neighbour.Y < height)
                         {
                             neighbours[x, y].Add(neighbour);
                         }
                     }
+                    foreach (var neighbour in pos.DirectNeighbours()) //.OrderBy(p => rnd.Next()))
+                    {
+                        if (neighbour.X >= 0 &&
+                            neighbour.Y >= 0 &&
+                            neighbour.X < width &&
+                            neighbour.Y < height)
+                        {
+                            directNeighbours[x, y].Add(neighbour);
+                        }
+                    }
                 }
             }
-            allBoardPositions = allBoardPositions.OrderBy(p => rnd.Next()).ToArray();
+            //allBoardPositions = allBoardPositions.OrderBy(p => rnd.Next()).ToArray();           
         }
 
         public Node GameTree(Board oldBoard, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth, int depth)
-        {           
+        {
 
-            Board board;            
+            Board board;
             if (move != null)
             {
                 byte b = maximizer ? (byte)'2' : (byte)'1';
                 board = Board.DeepCopy(oldBoard);
                 board.Data[move.X1, move.Y1] = b;
-                board.Data[move.X2, move.Y2] = b;                
+                board.Data[move.X2, move.Y2] = b;
             }
             else
             {
-                board = oldBoard;                
-            }           
+                board = oldBoard;
+            }
 
             //board.Display();
             //curNode.Board = board;
@@ -433,9 +470,9 @@ namespace DominectClient
                 return new Node(eval, move);
             }
 
-            if (remainingDepth == 0)
+            if (remainingDepth == 0 || stopwatch.Elapsed.TotalSeconds > 300)
             {
-                return new Node(Heuristic(board, depth), move);                              
+                return new Node(Heuristic(board, depth), move);
             }
 
             var possibleMoves = GetPossibleMoves(board);
@@ -450,7 +487,9 @@ namespace DominectClient
             foreach (var newMove in possibleMoves)
             {
                 var child = GameTree(board, newMove, !maximizer, alpha, beta, remainingDepth - 1, depth + 1);
-                curNode.Children.Add(child);               
+
+                if (depth == 0)
+                    Children.Add(child);
 
                 if (maximizer)
                 {
@@ -558,12 +597,14 @@ namespace DominectClient
                 Span<bool> processed = stackalloc bool[(int)board.Width * (int)board.Height];
                 foreach (var startingPos in allBoardPositions)
                 {
-                    int posInex = (int)startingPos.Y * (int)board.Width + (int)startingPos.X;
-                    if (processed[posInex]) continue;
-                    if (board.Data[startingPos.X, startingPos.Y] != b) continue;
+                    int posIndex = (int)startingPos.Y * (int)board.Width + (int)startingPos.X;
+                    if (processed[posIndex]) 
+                        continue;
+                    processed[posIndex] = true;
+                    if (board.Data[startingPos.X, startingPos.Y] != b) 
+                        continue;
                     queue.Clear();
                     queue.Enqueue(startingPos);
-                    processed[posInex] = true;
                     uint minCoord = player1 ? startingPos.X : startingPos.Y;
                     uint maxCoord = minCoord;
                     uint minCoordTotal = uint.MaxValue;
@@ -574,7 +615,7 @@ namespace DominectClient
                         var pos = queue.Dequeue();
                         foreach (var neighbour in neighbours[pos.X, pos.Y])
                         {
-                            int neighbourIndex = (int)neighbour.Y * (int)board.Width + (int)neighbour.X;
+                            int neighbourIndex = (int)(neighbour.Y * board.Width + neighbour.X);
 
                             if (processed[neighbourIndex])
                                 continue;
@@ -609,13 +650,12 @@ namespace DominectClient
                                     maxCoord = curCoord;
                                 }
                             }
-                            else if (neighbourByte == (byte)'0' &&
-                                neighbours[neighbour.X, neighbour.Y]
-                                    .Any(p => board.Data[p.X, p.Y] == (byte)'0'))
+                            else if (directNeighbours[neighbour.X, neighbour.Y]
+                                        .Any(p => board.Data[p.X, p.Y] == (byte)'0'))
                             {
                                 queue.Enqueue(neighbour);
                             }
-                            
+
                         }
                     }
 
@@ -623,7 +663,7 @@ namespace DominectClient
                     uint totalSize = maxCoordTotal - minCoordTotal + 1;
                     if (totalSize < (player1 ? board.Width : board.Height))
                     {
-                        score = -1;
+                        score = int.MinValue + depth;
                     }
                     else
                     {
@@ -634,7 +674,7 @@ namespace DominectClient
                 }
 
                 scores[player1 ? 0 : 1] = maxScore - depth;
-            });            
+            });
 
             var eval = scores[0] - scores[1];
             //Console.WriteLine("^Eval^: " + eval);
