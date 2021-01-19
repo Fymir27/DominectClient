@@ -454,10 +454,7 @@ namespace DominectClient
                         }
                     }
                 }
-            }
-
-            // TODO: weigh around middle? 
-            allBoardPositions.OrderBy(p => Math.Abs(p.X - p.Y)).ToArray();          //allBoardPositions = allBoardPositions.OrderBy(p => rnd.Next()).ToArray();      
+            }    
         }
 
         public Node GameTree(Board oldBoard, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth, int depth, bool presort)
@@ -505,7 +502,7 @@ namespace DominectClient
             }
             else
             {
-                possibleMoves = GetPossibleMoves(board);
+                possibleMoves = GetPossibleMoves(board).OrderBy(p => Math.Abs(p.X1 - p.Y1));
             }
 
             if (!possibleMoves.Any())

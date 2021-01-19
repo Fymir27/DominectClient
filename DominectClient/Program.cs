@@ -148,7 +148,7 @@ namespace DominectClient
             }
             */
 
-            //ManualPlay(9, 8, 3); // TODO: comment out and turn playing on again
+            //ManualPlay(15, 15, 3); // TODO: comment out and turn playing on again
 
 
             bool playing = true;
@@ -157,7 +157,7 @@ namespace DominectClient
             int aborted = 0;
             bool manualMode = false;
 
-            while(playing && gamesPlayed < 5)
+            while(playing && gamesPlayed < 10)
             {
                 var match = GetDominectMatch(client, 10, 10, userToken);
 
