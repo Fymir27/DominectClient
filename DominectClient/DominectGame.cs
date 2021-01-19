@@ -269,7 +269,7 @@ namespace DominectClient
             Console.WriteLine("You are player " + (gameStateResponse.BeginningPlayer ? 1 : 2));
 
             Console.WriteLine("Lets begin!");
-            
+
 
             InitInternals((int)gameStateResponse.DomGameState.BoardWidth, (int)gameStateResponse.DomGameState.BoardHeight);
 
@@ -337,15 +337,7 @@ namespace DominectClient
             int tilesTotal = board.Width * board.Height;
             int tilesPlaced = gameState.BoardData.Count(b => b != (byte)'0');
             int tilesFree = tilesTotal - tilesPlaced;
-            int depth = 4;
-            if(tilesFree < 70)
-            {
-                depth++;
-            }
-            if(tilesFree < 30)
-            {
-                depth++;
-            }
+            int depth = 3;           
 
 
             /*
@@ -361,7 +353,7 @@ namespace DominectClient
             int boardSize = gameState.BoardData.Length;
             int tilesLeft = boardSize - boardFillAmount;
 
-            Console.WriteLine("My turn! Calculating... Depth " + depth);
+            Console.WriteLine("My turn! Calculating...");
 
             Children.Clear();
             var root = GameTree(board, null, beginningPlayer, int.MinValue, int.MaxValue, depth, 0, true);
@@ -465,7 +457,7 @@ namespace DominectClient
             }
 
             // TODO: weigh around middle? 
-            //allBoardPositions = allBoardPositions.OrderBy(p => rnd.Next()).ToArray();      //allBoardPositions.OrderBy(p => Math.Abs(p.X - p.Y)).ToArray();          
+            allBoardPositions.OrderBy(p => Math.Abs(p.X - p.Y)).ToArray();          //allBoardPositions = allBoardPositions.OrderBy(p => rnd.Next()).ToArray();      
         }
 
         public Node GameTree(Board oldBoard, GameTurn move, bool maximizer, int alpha, int beta, int remainingDepth, int depth, bool presort)
@@ -494,18 +486,21 @@ namespace DominectClient
                 return new Node(eval, move);
             }
 
-            if (remainingDepth == 0 || Stopwatch.Elapsed.TotalSeconds > 300)
+            if (remainingDepth == 0)
             {
                 return new Node(Heuristic(board, depth), move);
             }
 
             IEnumerable<GameTurn> possibleMoves;
-            if (presort) 
+            if (presort)
             {
                 // presort children based on shallow tree
                 Children.Clear();
                 var tmpRoot = GameTree(oldBoard, move, maximizer, int.MinValue, int.MaxValue, 2, 0, false);
                 possibleMoves = Children.OrderBy(c => c.Evaluation).Select(c => new GameTurn() { X1 = c.X1, X2 = c.X2, Y1 = c.Y1, Y2 = c.Y2 }).ToArray();
+                if (possibleMoves.Count() < 100) remainingDepth++;
+                if (possibleMoves.Count() < 50) remainingDepth++;
+                Console.WriteLine("Depth: " + remainingDepth);
                 Children.Clear();
             }
             else
@@ -518,10 +513,15 @@ namespace DominectClient
                 return new Node(0, move);
             }
 
-            var curNode = new Node(0, move);            
+            var curNode = new Node(0, move);
 
             foreach (var newMove in possibleMoves)
             {
+                if(Stopwatch.Elapsed.TotalSeconds > 350)
+                {
+                    break;
+                }
+
                 var child = GameTree(board, newMove, !maximizer, alpha, beta, remainingDepth - 1, depth + 1, false);
 
                 if (depth == 0)
@@ -642,10 +642,10 @@ namespace DominectClient
                 foreach (var startingPos in allBoardPositions)
                 {
                     int posIndex = startingPos.Y * board.Width + startingPos.X;
-                    if (processed[posIndex]) 
+                    if (processed[posIndex])
                         continue;
                     processed[posIndex] = true;
-                    if (board.Data[startingPos.X, startingPos.Y] != b) 
+                    if (board.Data[startingPos.X, startingPos.Y] != b)
                         continue;
                     queue.Clear();
                     queue.Enqueue(startingPos);
@@ -725,11 +725,11 @@ namespace DominectClient
 
             return eval;
         }
-                
+
         public int Heuristic2(Board board, int depth)
         {
             //board.Display();            
-            int[] scores = new int[2] { int.MinValue, int.MinValue };           
+            int[] scores = new int[2] { int.MinValue, int.MinValue };
             Array.ForEach(new int[] { 0, 1 }, playerIndex =>
             {
                 bool player1 = playerIndex == 0;
@@ -747,7 +747,7 @@ namespace DominectClient
                 distance.Fill(int.MaxValue);
 
                 int fingerprint = 0;
-                if(player1)
+                if (player1)
                 {
                     for (int y = 0; y < h; y++)
                     {
@@ -793,7 +793,7 @@ namespace DominectClient
                         }
                     }
                 }
-               
+
                 //Span<bool> processed = stackalloc bool[(int)board.Width * (int)board.Height];               
 
                 while (queueFront != queueBack)
@@ -802,16 +802,56 @@ namespace DominectClient
                     var curPos = queue[queueFront];
                     queueFront = (queueFront + 1) % board.Data.Length;
 
-                    var curPosFingerprint = curPos.Y * w + curPos.X;                    
+                    var curPosFingerprint = curPos.Y * w + curPos.X;
                     var newDistance = distance[curPosFingerprint] + 1;
                     //processed[curPosFingerprint] = true;
 
-                    // TODO: check actual dominoe placement?
-                    foreach(var neighbour in neighbours[curPos.X, curPos.Y])
+                    // TODO: check actual domino placement?
+                    foreach (var neighbour in neighbours[curPos.X, curPos.Y])
                     {
                         var neighbourByte = board.Data[neighbour.X, neighbour.Y];
                         int neighbourFingerprint = neighbour.Y * w + neighbour.X;
-                        if (neighbourByte == playerBytes[playerIndex])
+                        
+                        if (neighbourByte == zeroByte)
+                        {
+                            if (distance[neighbourFingerprint] > newDistance)
+                            {
+                                //bool neighbourUpdated = false;
+                                foreach (var nn in directNeighbours[neighbour.X, neighbour.Y]) //.Where(p => board.Data[p.X, p.Y] == zeroByte))
+                                {
+                                    if (board.Data[nn.X, nn.Y] == zeroByte)
+                                    {
+                                        //if (!neighbourUpdated)
+                                        {
+                                            distance[neighbourFingerprint] = newDistance;
+                                            queue[queueBack].X = neighbour.X;
+                                            queue[queueBack].Y = neighbour.Y;
+                                            queueBack = (queueBack + 1) % board.Data.Length;
+                                            //neighbourUpdated = true;
+                                            break;
+                                        }
+                                        /*
+                                        var nnFingerprint = nn.Y * board.Width + nn.X;
+                                        if (distance[nnFingerprint] > newDistance)
+                                        {
+                                            distance[nnFingerprint] = newDistance;
+                                            queue[queueBack].X = nn.X;
+                                            queue[queueBack].Y = nn.Y;
+                                            queueBack = (queueBack + 1) % board.Data.Length;
+                                        }
+                                        */
+                                    }
+                                }                                
+                            }
+                            if (distance[neighbourFingerprint] > newDistance)
+                            {
+                                distance[neighbourFingerprint] = newDistance;
+                                queue[queueBack].X = neighbour.X;
+                                queue[queueBack].Y = neighbour.Y;
+                                queueBack = (queueBack + 1) % board.Data.Length;
+                            }
+                        } 
+                        else if (neighbourByte == playerBytes[playerIndex])
                         {
                             if (distance[neighbourFingerprint] > distance[curPosFingerprint])
                             {
@@ -822,27 +862,17 @@ namespace DominectClient
                                 queueBack = (queueBack + 1) % board.Data.Length;
                             }
                         }
-                        else if(neighbourByte == zeroByte)
-                        {
-                            if(distance[neighbourFingerprint] > newDistance)
-                            {
-                                distance[neighbourFingerprint] = newDistance;
-                                queue[queueBack].X = neighbour.X;
-                                queue[queueBack].Y = neighbour.Y;
-                                queueBack = (queueBack + 1) % board.Data.Length;
-                            }
-                        }                       
                     }
                 }
 
 
                 int minDistance = int.MaxValue;
-                if(player1)
+                if (player1)
                 {
                     for (int i = w - 1; i < distance.Length; i += w)
                     {
                         minDistance = Math.Min(minDistance, distance[i]);
-                    }                    
+                    }
                 }
                 else
                 {
@@ -855,7 +885,7 @@ namespace DominectClient
                 scores[playerIndex] = int.MaxValue - minDistance;
             });
 
-            var eval = scores[0] - scores[1];            
+            var eval = scores[0] - scores[1];
             //Console.WriteLine($"^ Heuristic: {eval} ^");
             return eval;
         }
@@ -892,7 +922,7 @@ namespace DominectClient
                             visited[x] = true;
                         }
                     }
-                }                                 
+                }
 
                 while (queue.Count > 0)
                 {
@@ -901,19 +931,19 @@ namespace DominectClient
                     visited[curPosFingerprint] = true;
 
                     foreach (var neighbour in neighbours[curPos.X, curPos.Y])
-                    {                        
+                    {
                         var neighbourFingerprint = neighbour.Y * board.Width + neighbour.X;
                         if (visited[neighbourFingerprint]) continue;
                         var neighbourByte = board.Data[neighbour.X, neighbour.Y];
                         if (neighbourByte == playerBytes[playerIndex])
                         {
-                            if(player1 && neighbour.X == board.Width - 1 || !player1 && neighbour.Y == board.Height - 1)
+                            if (player1 && neighbour.X == board.Width - 1 || !player1 && neighbour.Y == board.Height - 1)
                             {
-                                gameOver = true;                                
+                                gameOver = true;
                                 return;
-                            }                            
+                            }
                             queue.Enqueue(neighbour);
-                        }                        
+                        }
                     }
                 }
             });

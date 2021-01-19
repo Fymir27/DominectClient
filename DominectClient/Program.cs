@@ -148,7 +148,7 @@ namespace DominectClient
             }
             */
 
-            //ManualPlay(11, 11, 4); // TODO: comment out and turn playing on again
+            //ManualPlay(9, 8, 3); // TODO: comment out and turn playing on again
 
 
             bool playing = true;
