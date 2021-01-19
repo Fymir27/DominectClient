@@ -105,7 +105,7 @@ namespace DominectClient
                 UserToken = userToken,
                 GameToken = "dom",
                 MatchmakingParameters = mmParam,
-                TimeoutSuggestionSeconds = 5,
+                TimeoutSuggestionSeconds = 400,
                 DomGameParameters = new GameParameter()
                 {
                     BoardWidth = width,
@@ -148,28 +148,33 @@ namespace DominectClient
             }
             */
 
-            ManualPlay(15, 15, 4); // TODO: comment out and turn playing on again
+            ManualPlay(11, 11, 4); // TODO: comment out and turn playing on again
 
 
-            bool playing = false;
+            bool playing = true;
             int gamesPlayed = 0;
+            int wins = 0;
+            int aborted = 0;
             bool manualMode = true;
 
-            while(playing && gamesPlayed < 100)
+            while(playing && gamesPlayed < 10)
             {
-                var match = GetDominectMatch(client, 9, 9, userToken);
+                var match = GetDominectMatch(client, 10, 10, userToken);
 
                 var game = new DominectGame(client, match.MatchToken, userToken);
                 game.Start(match.BeginningPlayer);
                 if(game.MatchAborted)
                 {
-                    Console.WriteLine("Match was aborted!");
-                    break;
+                    aborted++;                                                            
+                } 
+                else if(game.Status == GameStatus.MatchWon)
+                {
+                    wins++;
                 }
                 gamesPlayed++;
-                Console.WriteLine("Games played: " + gamesPlayed);
+                Console.WriteLine("Games played: " + gamesPlayed + " - Wins/Aborted: " + wins + "/" + aborted);
 
-                if (manualMode)
+                if (manualMode || game.CriticalError)
                 {
                     Console.Write("Continue? (y|n) ");
                     var input = Console.ReadKey();
@@ -190,7 +195,7 @@ namespace DominectClient
             //File.WriteAllText("usertoken.txt", userToken);
         }
 
-        public static void ManualPlay(uint width, uint height, int depth)
+        public static void ManualPlay(int width, int height, int depth)
         {
             var rawBoard = new byte[width * height];
             Array.Fill(rawBoard, (byte)'0');
@@ -202,6 +207,10 @@ namespace DominectClient
             string line = "";
             do
             {
+                //System.GC.Collect();
+                //GC.WaitForPendingFinalizers();
+                //System.GC.Collect();
+
                 line = Console.ReadLine();
 
                 if (line.Length == 0) break;
@@ -223,12 +232,14 @@ namespace DominectClient
                     Y2 = y2
                 };
 
+                dummyGame.Stopwatch.Restart();
+                dummyGame.Children.Clear();
                 var start = System.DateTime.Now;
-                var root = dummyGame.GameTree(startingBoard, null, false, int.MinValue, int.MaxValue, depth, 0);
+                var root = dummyGame.GameTree(startingBoard, null, false, int.MinValue, int.MaxValue, depth, 0, true);
                 var end = System.DateTime.Now;
                 Console.WriteLine("Final root value: " + root.Evaluation + " (" + (end - start).TotalSeconds + "s)");              
 
-                var bestChild = root.Children.Aggregate((best, cur) => cur.Evaluation < best.Evaluation ? cur : best);
+                var bestChild = dummyGame.Children.Aggregate((best, cur) => cur.Evaluation < best.Evaluation ? cur : best);
                 var bestMove = new GameTurn()
                 {
                     X1 = bestChild.X1,
@@ -244,6 +255,7 @@ namespace DominectClient
 
                 startingBoard.Display(bestMove);
                 bestChild = null;
+                root = null;                
 
             } while (line.Length > 0);
 
