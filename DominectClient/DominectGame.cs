@@ -735,58 +735,73 @@ namespace DominectClient
                 bool player1 = playerIndex == 0;
                 int w = board.Width;
                 int h = board.Height;
-                int x = 0;
-                int y = 0;
                 int lenghtPerpendicular = player1 ? h : w;
                 int lengthParallel = player1 ? w : h;
 
-                var queue = new Queue<Position>();
+                //var queue = new Queue<Position>();
+                Span<Position> queue = stackalloc Position[board.Data.Length];
+                int queueFront = 0;
+                int queueBack = 0;
 
-                Span<int> distance = stackalloc int[board.Width * board.Height];
+                Span<int> distance = stackalloc int[board.Data.Length];
                 distance.Fill(int.MaxValue);
 
                 int fingerprint = 0;
                 if(player1)
                 {
-                    for (y = 0; y < h; y++)
+                    for (int y = 0; y < h; y++)
                     {
                         if (board.Data[0, y] == playerBytes[playerIndex])
                         {
                             distance[fingerprint] = 0;
-                            queue.Enqueue(new Position(0, y));
-
+                            //queue.Enqueue(new Position(0, y));
+                            queue[queueBack].X = 0;
+                            queue[queueBack].Y = y;
+                            queueBack = (queueBack + 1) % board.Data.Length;
                         }
                         else if (board.Data[0, y] == zeroByte)
                         {
                             distance[fingerprint] = 1;
-                            queue.Enqueue(new Position(0, y));
+                            //queue.Enqueue(new Position(0, y));
+                            queue[queueBack].X = 0;
+                            queue[queueBack].Y = y;
+                            queueBack = (queueBack + 1) % board.Data.Length;
                         }
                         fingerprint += w;
                     }
                 }
                 else
                 {
-                    for (x = 0; x < w; x++)
+                    for (int x = 0; x < w; x++)
                     {
                         if (board.Data[x, 0] == playerBytes[playerIndex])
                         {
                             distance[x] = 0;
-                            queue.Enqueue(new Position(x, 0));
+                            //queue.Enqueue(new Position(x, 0));
+                            queue[queueBack].X = x;
+                            queue[queueBack].Y = 0;
+                            queueBack = (queueBack + 1) % board.Data.Length;
 
                         }
                         else if (board.Data[x, 0] == zeroByte)
                         {
                             distance[x] = 1;
-                            queue.Enqueue(new Position(x, 0));
+                            //queue.Enqueue(new Position(x, 0));
+                            queue[queueBack].X = x;
+                            queue[queueBack].Y = 0;
+                            queueBack = (queueBack + 1) % board.Data.Length;
                         }
                     }
                 }
                
                 //Span<bool> processed = stackalloc bool[(int)board.Width * (int)board.Height];               
 
-                while (queue.Count > 0)
+                while (queueFront != queueBack)
                 {
-                    var curPos = queue.Dequeue();
+                    //var curPos = queue.Dequeue();
+                    var curPos = queue[queueFront];
+                    queueFront = (queueFront + 1) % board.Data.Length;
+
                     var curPosFingerprint = curPos.Y * w + curPos.X;                    
                     var newDistance = distance[curPosFingerprint] + 1;
                     //processed[curPosFingerprint] = true;
@@ -801,7 +816,10 @@ namespace DominectClient
                             if (distance[neighbourFingerprint] > distance[curPosFingerprint])
                             {
                                 distance[neighbourFingerprint] = distance[curPosFingerprint];
-                                queue.Enqueue(neighbour);
+                                //queue.Enqueue(neighbour);
+                                queue[queueBack].X = neighbour.X;
+                                queue[queueBack].Y = neighbour.Y;
+                                queueBack = (queueBack + 1) % board.Data.Length;
                             }
                         }
                         else if(neighbourByte == zeroByte)
@@ -809,7 +827,9 @@ namespace DominectClient
                             if(distance[neighbourFingerprint] > newDistance)
                             {
                                 distance[neighbourFingerprint] = newDistance;
-                                queue.Enqueue(neighbour);
+                                queue[queueBack].X = neighbour.X;
+                                queue[queueBack].Y = neighbour.Y;
+                                queueBack = (queueBack + 1) % board.Data.Length;
                             }
                         }                       
                     }

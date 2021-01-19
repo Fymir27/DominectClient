@@ -148,16 +148,16 @@ namespace DominectClient
             }
             */
 
-            ManualPlay(11, 11, 4); // TODO: comment out and turn playing on again
+            //ManualPlay(11, 11, 4); // TODO: comment out and turn playing on again
 
 
             bool playing = true;
             int gamesPlayed = 0;
             int wins = 0;
             int aborted = 0;
-            bool manualMode = true;
+            bool manualMode = false;
 
-            while(playing && gamesPlayed < 10)
+            while(playing && gamesPlayed < 5)
             {
                 var match = GetDominectMatch(client, 10, 10, userToken);
 
